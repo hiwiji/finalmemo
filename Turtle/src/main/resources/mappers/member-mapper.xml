@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="memberMapper">
+
+
+ 	<resultMap type="member" id="member_rm">
+		<id property="memberNo" column="MEMBER_NO"/>
+		
+		<result property="memberEmail" column="MEMBER_EMAIL"/>
+		<result property="memberPw" column="MEMBER_PW"/>
+		<result property="memberName" column="MEMBER_NAME"/>
+		<result property="memberGit" column="MEMBER_GIT"/>
+		<result property="profileImage" column="PROFILE_IMG"/>
+		<result property="enrollDate" column="ENROLL_DATE"/>
+		<result property="memberDeleteFG" column="MEMBER_DELETE_FG"/>
+		<result property="socialId" column="SOCIAL_ID"/>
+	</resultMap>
+	
+ 	<resultMap type="certification" id="certification_rm">
+		<id property="email" column="EMAIL"/>
+		<result property="codeNumber" column="CODE_NUMBER"/>
+		<result property="issueDate" column="ISSUE_DATE"/>
+	</resultMap>
+	
+
+	<!-- 로그인(회원정보 가져오기) 프로필 이미지 추가하기 -->
+	<select id="login" parameterType="member" resultMap="member_rm">
+		SELECT MEMBER_NO, MEMBER_EMAIL, MEMBER_NAME, PROFILE_IMG,
+		TO_CHAR(ENROLL_DATE, 'YYYY-MM-DD HH24:MI:SS') AS ENROLL_DATE, MEMBER_PW
+		FROM MEMBER
+		WHERE MEMBER_EMAIL = #{memberEmail}
+		AND MEMBER_DELETE_FG = 'N'
+	</select>
+	
+	<!-- 이메일 중복검사 -->
+	<select id="emailDupCheck" parameterType="string" resultType="_int">
+		SELECT count(*) FROM MEMBER 
+		WHERE MEMBER_EMAIL = #{memberEmail}
+		AND MEMBER_DELETE_FG = 'N'
+	</select>
+	
+	<!-- 회원가입 -->
+	<insert id="signUp" parameterType="member">
+		INSERT INTO MEMBER VALUES(
+			SEQ_MEMBER_NO.NEXTVAL,
+			#{memberEmail},
+			#{memberPw},
+			#{memberName},
+			NULL,
+			DEFAULT,
+			'/resources/images/memberProfile/member.png',
+			DEFAULT, NULL
+	)
+	</insert>
+
+  
+	<!-- [비밀번호]이메일 인증(회원인지 확인) -->
+	<select id="memberConfirmation" parameterType="string" resultType="string">
+		SELECT MEMBER_EMAIL
+		FROM MEMBER
+		WHERE MEMBER_EMAIL = #{inputEmail}
+		AND MEMBER_DELETE_FG = 'N'
+	</select>
+	
+	<!-- [비밀번호]이메일 인증 유무 확인(비회원 포함) -->
+	<select id="passwordSelectCertification" resultType="_int">
+		SELECT COUNT(*) FROM CERTIFICATION
+		WHERE EMAIL = #{email}
+	</select>
+	
+	<!-- [비밀번호]인증번호 수정(인증 받은적 있는경우) -->
+	<update id="passwordUpdateCertification">
+		UPDATE CERTIFICATION 
+		SET CODE_NUMBER = #{codeNumber}, ISSUE_DATE = SYSDATE
+		WHERE EMAIL = #{email}
+	</update>
+	
+	<!-- [비밀번호]인증번호 추가(인증 없는경우) -->
+	<insert id="passwordInsertCertification">
+		INSERT INTO CERTIFICATION VALUES(#{email}, #{codeNumber}, SYSDATE)
+	</insert>
+	
+	<!-- [비밀번호]인증번호 확인 -->
+	<select id="certificationNumber" resultType="_int">
+		SELECT MEMBER_NO
+		FROM "MEMBER" m 
+		JOIN CERTIFICATION c  ON(m.MEMBER_EMAIL = c.EMAIL)
+		WHERE c.CODE_NUMBER = #{certificationNumber}
+	</select>
+	
+	<!-- 결제 기간(한달) 초과 시 Basic(기본제공)으로 변경 -->
+	<update id="paymentDateCheck">
+		UPDATE PAYMENT 
+		SET PAY_TYPE = 'Basic' 
+		WHERE MEMBER_NO = ${memberNo}
+		AND PAY_REG_DATE + 30 >= SYSDATE
+	</update>
+
+  
+  <!-- createProject페이지 회원찾기 -->
+	<select id="searchmember" resultMap = "member_rm">
+		SELECT *
+		FROM MEMBER
+		WHERE MEMBER_NAME LIKE '%'||#{input}||'%'
+		OR SUBSTR(MEMBER_EMAIL,1,INSTR(MEMBER_EMAIL,'@')-1) LIKE '%'||#{input}||'%'
+	</select>
+
+	<insert id="insertCertification">
+	      INSERT INTO CERTIFICATION VALUES(#{inputEmail}, #{cNumber}, SYSDATE)
+	</insert>
+	
+   <update id="updateCertification">
+      UPDATE CERTIFICATION SET
+      CODE_NUMBER =  #{cNumber},
+      ISSUE_DATE = SYSDATE
+      WHERE EMAIL = #{inputEmail}
+   </update>
+	
+	<select id="checkNumber" resultType="_int">
+		SELECT 
+         CASE WHEN (SELECT '1' FROM CERTIFICATION
+                  WHERE EMAIL = #{inputEmail}
+                  AND CODE_NUMBER = #{cNumber})  = 1
+         
+            THEN NVL( (SELECT '1' FROM CERTIFICATION
+                  WHERE EMAIL = #{inputEmail}
+                  AND ISSUE_DATE + (INTERVAL '5' MINUTE) >= SYSDATE) , '2') 
+      
+            ELSE '3'   
+         END         
+      FROM DUAL
+	</select>
+
+
+
+</mapper>
